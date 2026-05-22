@@ -1,20 +1,23 @@
-// ─── Konfiguration från PHP (via index.php) ──────────────────────────────────
-// GAME_CONFIG.producers, GAME_CONFIG.upgrades, GAME_CONFIG.prestigeRequirement
 
-// ─── State ───────────────────────────────────────────────────────────────────
 
-let state = {
-  mass: 0,
-  clickPower: 1,
-  prestigeCount: 0,
-  prestigeMulti: 1,
-  producers: GAME_CONFIG.producers.map(() => 0),
-  upgrades: GAME_CONFIG.upgrades.map(() => false)
-};
+let state = null;
+let producerRates = null;
 
-let producerRates = GAME_CONFIG.producers.map(p => p.baseRate);
-
-// ─── Spara / Ladda via save.php ───────────────────────────────────────────────
+function initializeState() {
+  if (!state) {
+    state = {
+      mass: 0,
+      clickPower: 1,
+      prestigeCount: 0,
+      prestigeMulti: 1,
+      producers: GAME_CONFIG.producers.map(() => 0),
+      upgrades: GAME_CONFIG.upgrades.map(() => false)
+    };
+  }
+  if (!producerRates) {
+    producerRates = GAME_CONFIG.producers.map(p => p.baseRate);
+  }
+}
 
 async function saveGame() {
   try {
@@ -31,16 +34,32 @@ async function saveGame() {
 }
 
 async function loadGame() {
+  initializeState();
   try {
     const res = await fetch("save.php");
     const data = await res.json();
-    if (data.empty) return;
+    if (data.empty) {
+      render();
+      return;
+    }
     state = data.state;
     producerRates = data.producerRates;
+    while (state.producers.length < GAME_CONFIG.producers.length) {
+      state.producers.push(0);
+    }
+    while (state.upgrades.length < GAME_CONFIG.upgrades.length) {
+      state.upgrades.push(false);
+    }
+    while (producerRates.length < GAME_CONFIG.producers.length) {
+      producerRates.push(GAME_CONFIG.producers[producerRates.length].baseRate);
+    }
     showSaveStatus("Laddade sparad data");
     render();
   } catch (e) {
+    console.error("Error loading game:", e);
+    initializeState();
     showSaveStatus("Ingen sparad data");
+    render();
   }
 }
 
@@ -56,8 +75,6 @@ function showSaveStatus(msg) {
 
 setInterval(saveGame, 30000);
 
-// ─── Hjälpfunktioner ─────────────────────────────────────────────────────────
-
 function formatMass(n) {
   if (n >= 1e12) return (n / 1e12).toFixed(2) + " Tg";
   if (n >= 1e9)  return (n / 1e9).toFixed(2)  + " Gg";
@@ -67,12 +84,14 @@ function formatMass(n) {
 }
 
 function producerCost(index) {
+  initializeState();
   return Math.floor(
     GAME_CONFIG.producers[index].baseCost * Math.pow(1.15, state.producers[index])
   );
 }
 
 function getPerSec() {
+  initializeState();
   let total = 0;
   for (let i = 0; i < producerRates.length; i++) {
     total += state.producers[i] * producerRates[i];
@@ -80,9 +99,8 @@ function getPerSec() {
   return total * state.prestigeMulti;
 }
 
-// ─── Åtgärder ────────────────────────────────────────────────────────────────
-
 function doClick() {
+  initializeState();
   const gain = state.clickPower * state.prestigeMulti;
   state.mass += gain;
   const btn = document.getElementById("click-btn");
@@ -93,20 +111,19 @@ function doClick() {
 }
 
 function buyProducer(index) {
+  initializeState();
   const cost = producerCost(index);
   if (state.mass < cost) return;
   state.mass -= cost;
   state.producers[index]++;
+  saveGame();
   render();
 }
 
 function buyUpgrade(index) {
-  if (index < 0 || index >= GAME_CONFIG.upgrades.length) return;
-  if (!state.upgrades[index]) {
-    state.upgrades[index] = false;
-  }
+  initializeState();
   const u = GAME_CONFIG.upgrades[index];
-  if (state.upgrades[index] || state.mass < u.cost) return;
+  if (!u || state.upgrades[index] || state.mass < u.cost) return;
   state.mass -= u.cost;
   state.upgrades[index] = true;
   if (u.type === "click") {
@@ -132,9 +149,8 @@ async function doPrestige() {
   render();
 }
 
-// ─── Render ──────────────────────────────────────────────────────────────────
-
 function render() {
+  initializeState();
   document.getElementById("mass-display").textContent = formatMass(state.mass);
   document.getElementById("per-sec").textContent = "+" + formatMass(getPerSec()) + "/s";
 
@@ -190,19 +206,18 @@ function render() {
   });
 }
 
-// ─── Event listeners ─────────────────────────────────────────────────────────
-
 document.getElementById("click-btn").addEventListener("click", doClick);
 document.getElementById("prestige-btn").addEventListener("click", doPrestige);
 
-// ─── Game loop ───────────────────────────────────────────────────────────────
+async function startGame() {
+  await loadGame();
+  setInterval(() => {
+    const ps = getPerSec();
+    if (ps > 0) {
+      state.mass += ps / 20;
+      render();
+    }
+  }, 50);
+}
 
-setInterval(() => {
-  const ps = getPerSec();
-  if (ps > 0) {
-    state.mass += ps / 20;
-    render();
-  }
-}, 50);
-
-loadGame();
+startGame();

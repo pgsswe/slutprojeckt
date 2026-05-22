@@ -42,7 +42,6 @@ require_once "config.php";
     <div id="save-status"></div>
   </div>
 
-  <!-- PHP skickar spelkonfigurationen till JavaScript -->
   <script>
     const GAME_CONFIG = {
       producers: <?= json_encode($PRODUCERS) ?>,

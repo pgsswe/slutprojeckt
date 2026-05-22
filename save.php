@@ -1,6 +1,4 @@
 <?php
-// ─── save.php — Sparar och laddar speldata via JSON ──────────────────────────
-
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
 
@@ -9,7 +7,6 @@ $saveFile = __DIR__ . "/savedata.json";
 $method = $_SERVER["REQUEST_METHOD"];
 
 if ($method === "POST") {
-    // Spara speldata
     $body = file_get_contents("php://input");
     $data = json_decode($body, true);
 
@@ -25,7 +22,6 @@ if ($method === "POST") {
     echo json_encode(["success" => true, "savedAt" => $data["savedAt"]]);
 
 } elseif ($method === "GET") {
-    // Ladda speldata
     if (file_exists($saveFile)) {
         $raw = file_get_contents($saveFile);
         echo $raw;
@@ -34,7 +30,6 @@ if ($method === "POST") {
     }
 
 } elseif ($method === "DELETE") {
-    // Radera spardata (prestige reset)
     if (file_exists($saveFile)) {
         unlink($saveFile);
     }

@@ -1,5 +1,4 @@
 <?php
-// ─── Spelkonfiguration ───────────────────────────────────────────────────────
 
 $PRODUCERS = [
     ["name" => "Atom",      "desc" => "+0.1 kg/s",  "baseRate" => 0.1,  "baseCost" => 10],
