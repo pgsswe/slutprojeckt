@@ -1,19 +1,19 @@
 {
     "state": {
-        "mass": 797.5999999997905,
+        "mass": 47.329999999998854,
         "clickPower": 2,
         "prestigeCount": 0,
         "prestigeMulti": 1,
         "producers": [
-            0,
             1,
+            0,
             0,
             0,
             0
         ],
         "upgrades": [
             true,
-            false,
+            true,
             false,
             false,
             false,
@@ -23,11 +23,11 @@
         ]
     },
     "producerRates": [
-        0.1,
+        0.2,
         1,
         10,
         80,
         500
     ],
-    "savedAt": "2026-05-22 10:36:20"
+    "savedAt": "2026-05-22 20:15:19"
 }

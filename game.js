@@ -1,5 +1,3 @@
-
-
 let state = null;
 let producerRates = null;
 
@@ -17,6 +15,15 @@ function initializeState() {
   if (!producerRates) {
     producerRates = GAME_CONFIG.producers.map(p => p.baseRate);
   }
+}
+
+function recalculateRates() {
+  producerRates = GAME_CONFIG.producers.map(p => p.baseRate);
+  GAME_CONFIG.upgrades.forEach((u, i) => {
+    if (state.upgrades[i] && u.type === "producer") {
+      producerRates[u.target] *= u.mult;
+    }
+  });
 }
 
 async function saveGame() {
@@ -42,17 +49,32 @@ async function loadGame() {
       render();
       return;
     }
-    state = data.state;
-    producerRates = data.producerRates;
+    state = data.state || {};
+    if (!Array.isArray(state.producers)) {
+      state.producers = GAME_CONFIG.producers.map(() => 0);
+    }
+    if (!Array.isArray(state.upgrades)) {
+      state.upgrades = GAME_CONFIG.upgrades.map(() => false);
+    }
     while (state.producers.length < GAME_CONFIG.producers.length) {
       state.producers.push(0);
     }
     while (state.upgrades.length < GAME_CONFIG.upgrades.length) {
       state.upgrades.push(false);
     }
-    while (producerRates.length < GAME_CONFIG.producers.length) {
-      producerRates.push(GAME_CONFIG.producers[producerRates.length].baseRate);
+    producerRates = Array.isArray(data.producerRates)
+      ? data.producerRates.slice(0, GAME_CONFIG.producers.length)
+      : GAME_CONFIG.producers.map(p => p.baseRate);
+    if (producerRates.length < GAME_CONFIG.producers.length) {
+      producerRates = GAME_CONFIG.producers.map(p => p.baseRate);
     }
+    recalculateRates();
+    state.clickPower = 1;
+    GAME_CONFIG.upgrades.forEach((u, i) => {
+      if (state.upgrades[i] && u.type === "click") {
+        state.clickPower *= u.mult;
+      }
+    });
     showSaveStatus("Laddade sparad data");
     render();
   } catch (e) {
@@ -110,17 +132,17 @@ function doClick() {
   render();
 }
 
-function buyProducer(index) {
+async function buyProducer(index) {
   initializeState();
   const cost = producerCost(index);
   if (state.mass < cost) return;
   state.mass -= cost;
   state.producers[index]++;
-  saveGame();
+  await saveGame();
   render();
 }
 
-function buyUpgrade(index) {
+async function buyUpgrade(index) {
   initializeState();
   const u = GAME_CONFIG.upgrades[index];
   if (!u || state.upgrades[index] || state.mass < u.cost) return;
@@ -131,7 +153,7 @@ function buyUpgrade(index) {
   } else if (u.type === "producer") {
     producerRates[u.target] *= u.mult;
   }
-  saveGame();
+  await saveGame();
   render();
 }
 
@@ -169,18 +191,27 @@ function render() {
   GAME_CONFIG.upgrades.forEach((u, i) => {
     if (state.upgrades[i]) return;
     const canAfford = state.mass >= u.cost;
+    
     const div = document.createElement("div");
     div.className = "item" + (canAfford ? " can-afford" : " disabled");
-    div.innerHTML = `
-      <div class="item-left">
-        <div class="name">${u.name}</div>
-        <div class="desc">${u.desc}</div>
-      </div>
-      <div class="item-right">
-        <button class="buy-btn" ${canAfford ? "" : "disabled"} onclick="buyUpgrade(${i})">
-          ${formatMass(u.cost)}
-        </button>
-      </div>`;
+
+    const leftDiv = document.createElement("div");
+    leftDiv.className = "item-left";
+    leftDiv.innerHTML = `<div class="name">${u.name}</div><div class="desc">${u.desc}</div>`;
+
+    const rightDiv = document.createElement("div");
+    rightDiv.className = "item-right";
+
+    const btn = document.createElement("button");
+    btn.className = "buy-btn";
+    btn.disabled = !canAfford;
+    btn.textContent = formatMass(u.cost);
+    
+    btn.addEventListener("click", () => buyUpgrade(i));
+
+    rightDiv.appendChild(btn);
+    div.appendChild(leftDiv);
+    div.appendChild(rightDiv);
     ul.appendChild(div);
   });
 
@@ -189,19 +220,32 @@ function render() {
   GAME_CONFIG.producers.forEach((p, i) => {
     const cost = producerCost(i);
     const canAfford = state.mass >= cost;
+    
     const div = document.createElement("div");
     div.className = "item" + (canAfford ? " can-afford" : " disabled");
-    div.innerHTML = `
-      <div class="item-left">
-        <div class="name">${p.name}</div>
-        <div class="desc">${p.desc}</div>
-      </div>
-      <div class="item-right">
-        <span class="item-count">${state.producers[i]}</span>
-        <button class="buy-btn" ${canAfford ? "" : "disabled"} onclick="buyProducer(${i})">
-          ${formatMass(cost)}
-        </button>
-      </div>`;
+
+    const leftDiv = document.createElement("div");
+    leftDiv.className = "item-left";
+    leftDiv.innerHTML = `<div class="name">${p.name}</div><div class="desc">${p.desc}</div>`;
+
+    const rightDiv = document.createElement("div");
+    rightDiv.className = "item-right";
+
+    const countSpan = document.createElement("span");
+    countSpan.className = "item-count";
+    countSpan.textContent = state.producers[i];
+
+    const btn = document.createElement("button");
+    btn.className = "buy-btn";
+    btn.disabled = !canAfford;
+    btn.textContent = formatMass(cost);
+    
+    btn.addEventListener("click", () => buyProducer(i));
+
+    rightDiv.appendChild(countSpan);
+    rightDiv.appendChild(btn);
+    div.appendChild(leftDiv);
+    div.appendChild(rightDiv);
     pl.appendChild(div);
   });
 }
